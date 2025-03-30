@@ -27,6 +27,7 @@ const addTagBtn = document.getElementById('addTagBtn');
 const searchInput = document.getElementById('searchInput');
 const filterType = document.getElementById('filterType');
 const workoutsContainer = document.getElementById('workoutsContainer');
+const tagSearchInput = document.getElementById('tagSearchInput');
 
 
 /*
@@ -84,7 +85,7 @@ async function init() {
       console.error('Error initializing application:', err);
     }
   }
-async function loadSetsFromSupabase() {
+  async function loadSetsFromSupabase() {
     try {
       const { data, error } = await supabasePublicClient.from("sets").select("*");
       
@@ -94,6 +95,14 @@ async function loadSetsFromSupabase() {
       }
       
       console.log('Successfully loaded sets from Supabase:', data);
+      
+      // Log tag information for debugging
+      if (data && data.length > 0) {
+        data.forEach((set, index) => {
+          console.log(`Set ${index} tags:`, set.tags, typeof set.tags);
+        });
+      }
+      
       return data || [];
     } catch (err) {
       console.error('Exception when loading sets from Supabase:', err);
@@ -103,7 +112,43 @@ async function loadSetsFromSupabase() {
 
 // Convert Supabase set format to our local workout format
 function convertSupabaseSetToWorkout(set) {
-    return {
+  // Extract and process tags to ensure they're readable strings
+  let processedTags = [];
+  
+  if (set.tags) {
+      // If tags is an array
+      if (Array.isArray(set.tags)) {
+          processedTags = set.tags.map(tag => {
+              // Convert each tag to string and capitalize first letter
+              return formatTagString(String(tag));
+          });
+      } 
+      // If tags is a string (might be JSON)
+      else if (typeof set.tags === 'string') {
+          try {
+              // Try to parse as JSON
+              const parsedTags = JSON.parse(set.tags);
+              if (Array.isArray(parsedTags)) {
+                  processedTags = parsedTags.map(tag => formatTagString(String(tag)));
+              } else {
+                  // If it's a JSON object, extract values
+                  processedTags = Object.values(parsedTags).map(tag => formatTagString(String(tag)));
+              }
+          } catch (e) {
+              // If not valid JSON, treat as a single tag
+              processedTags = [formatTagString(set.tags)];
+          }
+      }
+      // If tags is an object (not an array)
+      else if (typeof set.tags === 'object') {
+          processedTags = Object.values(set.tags).map(tag => formatTagString(String(tag)));
+      }
+  }
+  
+  // Filter out any empty tags
+  processedTags = processedTags.filter(tag => tag && tag.trim() !== '');
+  
+  return {
       id: set.id,
       title: set.name || 'Unnamed Workout',
       totalDistance: set.total_distance || 0,
@@ -112,16 +157,16 @@ function convertSupabaseSetToWorkout(set) {
       distanceType: set.distance_type || 'yards',
       notes: set.notes || '',
       exercises: Array.isArray(set.exercise) ? set.exercise.map(ex => ({
-        repeats: ex.repeats || 1,
-        amount: ex.amount || 0,
-        stroke: ex.stroke || 'freestyle',
-        drill: ex.drill || '',
-        interval: ex.interval || ''
+          repeats: ex.repeats || 1,
+          amount: ex.amount || 0,
+          stroke: ex.stroke || 'freestyle',
+          drill: ex.drill || '',
+          interval: ex.interval || ''
       })) : [],
-      tags: Array.isArray(set.tags) ? set.tags : [],
+      tags: processedTags,
       date: set.date || new Date().toISOString()
-    };
-  }
+  };
+}
 // Load workouts from localStorage
 async function loadWorkouts() {
     try {
@@ -153,24 +198,31 @@ function addWorkoutCardEventListeners(workoutCard, workout) {
   }
 // Setup event listeners
 function setupEventListeners() {
-    // Form submission
-    workoutForm.addEventListener('submit', handleFormSubmit);
-    
-    // Add exercise button
-    addExerciseBtn.addEventListener('click', addExercise);
-    
-    // Add tag button
-    addTagBtn.addEventListener('click', addTag);
-    tagInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addTag();
-        }
-    });
-    
-    // Search and filter
-    searchInput.addEventListener('input', renderWorkouts);
-    filterType.addEventListener('change', renderWorkouts);
+  // Form submission
+  workoutForm.addEventListener('submit', handleFormSubmit);
+  
+  // Add exercise button
+  addExerciseBtn.addEventListener('click', addExercise);
+  
+  // Add tag button
+  addTagBtn.addEventListener('click', addTag);
+  tagInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+          e.preventDefault();
+          addTag();
+      }
+  });
+  
+  // Search and filter
+  searchInput.addEventListener('input', renderWorkouts);
+  
+  // Add tag search listener
+  tagSearchInput.addEventListener('input', renderWorkouts);
+  
+  // If filterType exists, add its event listener
+  if (filterType) {
+      filterType.addEventListener('change', renderWorkouts);
+  }
 }
 function handleFormSubmit(e) {
     e.preventDefault();
@@ -353,7 +405,7 @@ function addExercise() {
             </div>
             
             <div class="form-group">
-                <label>Amount (m)</label>
+                <label>Distance (m)</label>
                 <input type="number" class="exercise-amount" required>
             </div>
             
@@ -556,15 +608,28 @@ function resetExercises() {
     
     exerciseCounter = 1;
 }
-
+function formatTagString(tag) {
+  if (!tag) return '';
+  
+  // Remove any quotes, brackets, or other JSON artifacts
+  tag = tag.replace(/["'\{\}\[\]]/g, '');
+  
+  // Replace underscores with spaces
+  tag = tag.replace(/_/g, ' ');
+  
+  // Capitalize first letter of each word
+  return tag.trim().split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
+}
 // Add a tag
 function addTag() {
-    const tag = tagInput.value.trim();
-    if (tag && !currentTags.includes(tag)) {
-        currentTags.push(tag);
-        renderTags();
-        tagInput.value = '';
-    }
+  const tag = formatTagString(tagInput.value.trim());
+  if (tag && !currentTags.includes(tag)) {
+      currentTags.push(tag);
+      renderTags();
+      tagInput.value = '';
+  }
 }
 
 // Remove a tag
@@ -600,24 +665,23 @@ function resetTags() {
 
 // Filter workouts based on search and filter type
 function filterWorkouts() {
-    const searchTerm = searchInput.value.toLowerCase();
-    const filter = filterType.value;
-    
-    return workouts.filter(workout => {
-      const matchesSearch = 
-        (workout.title && workout.title.toLowerCase().includes(searchTerm)) ||
-        (workout.mainStroke && workout.mainStroke.toLowerCase().includes(searchTerm)) ||
-        (Array.isArray(workout.tags) && workout.tags.some(tag => tag && tag.toLowerCase().includes(searchTerm))) ||
-        (Array.isArray(workout.exercises) && workout.exercises.some(ex => ex && ex.stroke && ex.stroke.toLowerCase().includes(searchTerm)));
-      
-      if (filter === 'all') return matchesSearch;
-      if (filter === 'stroke') return workout.mainStroke && workout.mainStroke.toLowerCase().includes(searchTerm);
-      if (filter === 'tag') return Array.isArray(workout.tags) && workout.tags.some(tag => tag && tag.toLowerCase().includes(searchTerm));
-      
-      return matchesSearch;
-    });
-  }
+  const searchTerm = searchInput.value.toLowerCase();
+  const tagSearchTerm = tagSearchInput ? tagSearchInput.value.toLowerCase() : '';
   
+  return workouts.filter(workout => {
+      // Match by title or notes
+      const matchesSearch = 
+          (workout.title && workout.title.toLowerCase().includes(searchTerm)) || 
+          (workout.notes && workout.notes.toLowerCase().includes(searchTerm));
+      
+      // Match by formatted tags
+      const matchesTags = tagSearchTerm === '' || 
+          (Array.isArray(workout.tags) && 
+          workout.tags.some(tag => tag && tag.toLowerCase().includes(tagSearchTerm)));
+      
+      return matchesSearch && matchesTags;
+  });
+}
 
 // Render workouts
 function renderWorkouts() {
@@ -626,7 +690,7 @@ function renderWorkouts() {
     if (filteredWorkouts.length === 0) {
       workoutsContainer.innerHTML = `
         <div class="card empty-state">
-          <p>No workouts found. Try a different search or add your first workout!</p>
+          <p>No workouts found. Try a different searchs</p>
         </div>
       `;
       return;
@@ -693,14 +757,16 @@ function renderWorkouts() {
       // Tags
       let tagsHTML = '';
       if (workout.tags && Array.isArray(workout.tags) && workout.tags.length > 0) {
-        tagsHTML = `
-          <div class="workout-tags">
-            <div class="section-heading">Tags:</div>
-            <div class="tags-container">
-              ${workout.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
-            </div>
-          </div>
-        `;
+          tagsHTML = `
+              <div class="workout-tags">
+                  <div class="section-heading">Tags:</div>
+                  <div class="tags-container">
+                      ${workout.tags.map(tag => 
+                          tag ? `<span class="tag">${tag}</span>` : ''
+                      ).join('')}
+                  </div>
+              </div>
+          `;
       }
       
       // Notes

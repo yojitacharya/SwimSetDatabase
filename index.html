@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Swim Workout Tracker</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Swim Workouts Database</h1>
+            <p>Upload, organize, and search swimming workouts</p>
+        </header>
+        
+        <div class="grid-container">
+            <!-- Form Section -->
+            <div class="card form-section">
+                <h2>Add New Workout</h2>
+                
+                <form id="workoutForm">
+                    <div class="form-group">
+                        <label for="title">Workout Title</label>
+                        <input type="text" id="title" name="title" required>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="totalDistance">Total Distance (meters)</label>
+                            <input type="number" id="totalDistance" name="totalDistance" placeholder="Auto-calculated if empty">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="mainStroke">Main Stroke</label>
+                            <select id="mainStroke" name="mainStroke">
+                                <option value="freestyle">Freestyle</option>
+                                <option value="backstroke">Backstroke</option>
+                                <option value="breaststroke">Breaststroke</option>
+                                <option value="butterfly">Butterfly</option>
+                                <option value="im">Individual Medley</option>
+                                <option value="mixed">Mixed</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="intensity">Intensity</label>
+                            <select id="intensity" name="intensity">
+                                <option value="low">Low</option>
+                                <option value="medium">Medium</option>
+                                <option value="high">High</option>
+                                <option value="max">Maximum</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="distanceType">Distance Type</label>
+                            <select id="distanceType" name="distanceType">
+                                <option value="sprint">Sprint</option>
+                                <option value="middle">Middle Distance</option>
+                                <option value="endurance">Endurance</option>
+                                <option value="mixed">Mixed</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Exercises</label>
+                        <div id="exercisesContainer">
+
+                        </div>
+                        
+                        <button type="button" id="addExerciseBtn" class="button button-secondary">Add Exercise</button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tag (use one) </label>
+                        <div id="tagsContainer" class="tags-container"></div>
+                        
+                        <div class="tag-input-container">
+                            <input type="text" id="tagInput" placeholder="Add a tag (e.g., recovery, technique)">
+                            <button type="button" id="addTagBtn" class="button button-secondary">Add</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes">Notes</label>
+                        <textarea id="notes" name="notes" rows="3" placeholder="Additional notes, coaching tips, etc."></textarea>
+                    </div>
+                    
+                    <button type="submit" class="button button-primary">Save Workout</button>
+                </form>
+            </div>
+            
+            <!-- Search and Results Section -->
+            <div>
+                <div class="card search-section">
+                    <h2>Find Workouts</h2>
+                    
+                    <div class="search-container">
+                        <input type="text" id="searchInput" placeholder="Search workouts...">
+                        
+                        <select id="filterType">
+                            <option value="all">All</option>
+                            <option value="stroke">Stroke</option>
+                            <option value="tag">Tag</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="workoutsContainer" class="workouts-container">
+                    <!-- Workout cards will be inserted here -->
+                    <div class="card empty-state">
+                        <p>No workouts found. Try a different search or add your first workout!</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+</body>
+</html>

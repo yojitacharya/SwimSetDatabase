@@ -334,7 +334,6 @@ async function uploadWorkoutToSupabase(workout) {
         drill: exercise.drill,
         interval: exercise.interval
     }));
-    console.log('Exercise Array:', exerciseArray);
 
     try {
         const response = await fetch('https://ptiekggppucoprpfbjkj.supabase.co/rest/v1/rpc/add_set', {
@@ -690,7 +689,7 @@ function renderWorkouts() {
     if (filteredWorkouts.length === 0) {
       workoutsContainer.innerHTML = `
         <div class="card empty-state">
-          <p>No workouts found. Try a different searchs</p>
+          <p>No workouts found. Try a different search</p>
         </div>
       `;
       return;

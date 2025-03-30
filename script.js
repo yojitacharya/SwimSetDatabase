@@ -8,51 +8,9 @@ const supabasePublicClient = supabase.createClient("https://ptiekggppucoprpfbjkj
 });
 
 (async () => {
-    try {
-        console.log("Starting test request to Supabase...");
-        
-        // Adjust the exercise JSON to fit the jsonb[] type
-        const exerciseArray = [ // This ensures the data is an array of JSON objects
-            {
-                "repeats": 3,
-                "amount": 100,
-                "stroke": "freestyle",
-                "drill": "stroke",
-                "interval": "1:40"
-            },
-            {
-                "repeats": 6,
-                "amount": 50,
-                "stroke": "freestyle",
-                "drill": "drill",
-                "interval": "1:10"
-            },
-            {
-                "repeats": 4,
-                "amount": 50,
-                "stroke": "freestyle",
-                "drill": "kick",
-                "interval": "1:15"
-            }
-        ];
+    const response = await supabasePublicClient.from("sets").select("*")
 
-        const response = await supabasePublicClient.from("sets").insert([
-            {
-                date: formattedDate,
-                name: "warmup",
-                notes: "warmup",
-                tags: "warmup",
-                total_distance: 300,
-                distance_type: "sprint",
-                intensity: "low",
-                exercise: exerciseArray  // Use the array here
-            }
-        ]);
-
-        console.log("Response:", response);
-    } catch (error) {
-        console.error("Error during test request:", error);
-    }
+    
 })();
 
 
@@ -84,54 +42,115 @@ let currentTags = [];
 let exerciseCounter = 1;
 
 // Initialize the app
-function init() {
-    // Log what elements we've found
-    
-    loadWorkouts();
-    renderWorkouts();
-    setupEventListeners();
-    
-    // Create and insert exercise preview container
-    exercisePreviewContainer = document.createElement('div');
-    exercisePreviewContainer.className = 'exercise-preview-container';
-    exercisePreviewContainer.innerHTML = '<h3>Added Exercises</h3>';
-    
-    // Check if elements exist before inserting
-    if (!exercisesContainer) {
+async function init() {
+    try {
+      // Load workouts from Supabase
+      await loadWorkouts();
+      renderWorkouts();
+      setupEventListeners();
+      
+      // Create and insert exercise preview container
+      exercisePreviewContainer = document.createElement('div');
+      exercisePreviewContainer.className = 'exercise-preview-container';
+      exercisePreviewContainer.innerHTML = '<h3>Added Exercises</h3>';
+      
+      // Check if elements exist before inserting
+      if (!exercisesContainer) {
         console.error('Exercises container not found!');
         return;
-    }
-    
-    if (!exercisesContainer.parentNode) {
+      }
+      
+      if (!exercisesContainer.parentNode) {
         console.error('Exercises container parent not found!');
         return;
-    }
-    
-    if (!addExerciseBtn) {
+      }
+      
+      if (!addExerciseBtn) {
         console.error('Add exercise button not found!');
         // Fall back to appending to exercises container
         exercisesContainer.appendChild(exercisePreviewContainer);
-    } else {
+      } else {
         // Insert after exercises container but before add button
         console.log('Inserting preview container');
         exercisesContainer.parentNode.insertBefore(exercisePreviewContainer, addExerciseBtn.nextSibling);
+      }
+      
+      // Set up initial exercise row buttons
+      const initialRow = exercisesContainer.querySelector('.exercise-row');
+      if (initialRow) {
+        setupExerciseRowButtons(initialRow);
+      }
+    } catch (err) {
+      console.error('Error initializing application:', err);
     }
-    
-    // Set up initial exercise row buttons
-    const initialRow = exercisesContainer.querySelector('.exercise-row');
+  }
+async function loadSetsFromSupabase() {
+    try {
+      const { data, error } = await supabasePublicClient.from("sets").select("*");
+      
+      if (error) {
+        console.error('Error loading sets from Supabase:', error);
+        return [];
+      }
+      
+      console.log('Successfully loaded sets from Supabase:', data);
+      return data || [];
+    } catch (err) {
+      console.error('Exception when loading sets from Supabase:', err);
+      return [];
+    }
 }
 
+// Convert Supabase set format to our local workout format
+function convertSupabaseSetToWorkout(set) {
+    return {
+      id: set.id,
+      title: set.name || 'Unnamed Workout',
+      totalDistance: set.total_distance || 0,
+      mainStroke: set.main_stroke || 'freestyle',
+      intensity: set.intensity || 'medium',
+      distanceType: set.distance_type || 'yards',
+      notes: set.notes || '',
+      exercises: Array.isArray(set.exercise) ? set.exercise.map(ex => ({
+        repeats: ex.repeats || 1,
+        amount: ex.amount || 0,
+        stroke: ex.stroke || 'freestyle',
+        drill: ex.drill || '',
+        interval: ex.interval || ''
+      })) : [],
+      tags: Array.isArray(set.tags) ? set.tags : [],
+      date: set.date || new Date().toISOString()
+    };
+  }
 // Load workouts from localStorage
-function loadWorkouts() {
-    const savedWorkouts = localStorage.getItem('swimWorkouts');
-    workouts = savedWorkouts ? JSON.parse(savedWorkouts) : [];
-}
-
+async function loadWorkouts() {
+    try {
+      const sets = await loadSetsFromSupabase();
+      workouts = sets.map(convertSupabaseSetToWorkout);
+      return workouts;
+    } catch (err) {
+      console.error('Error loading workouts:', err);
+      return [];
+    }
+  }
 // Save workouts to localStorage
 function saveWorkouts() {
     localStorage.setItem('swimWorkouts', JSON.stringify(workouts));
 }
-
+function addWorkoutCardEventListeners(workoutCard, workout) {
+    
+    // Add a visual indicator that the card is clickable
+    workoutCard.style.cursor = 'pointer';
+    
+    // Add hover effect
+    workoutCard.addEventListener('mouseenter', () => {
+      workoutCard.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+    });
+    
+    workoutCard.addEventListener('mouseleave', () => {
+      workoutCard.style.boxShadow = '';
+    });
+  }
 // Setup event listeners
 function setupEventListeners() {
     // Form submission
@@ -161,25 +180,25 @@ function handleFormSubmit(e) {
     const previewItems = exercisePreviewContainer.querySelectorAll('.exercise-preview-item');
     
     previewItems.forEach(item => {
-        const repeats = item.querySelector('.preview-repeats').value;
-        const amount = item.querySelector('.preview-amount').value;
-        const stroke = item.querySelector('.preview-stroke').value;
-        const drill = item.querySelector('.preview-drill').value;
-        const interval = item.querySelector('.preview-interval').value;
-        
-        exercises.push({
-            repeats,
-            amount,
-            stroke,
-            drill,
-            interval
-        });
+      const repeats = item.querySelector('.preview-repeats').value;
+      const amount = item.querySelector('.preview-amount').value;
+      const stroke = item.querySelector('.preview-stroke').value;
+      const drill = item.querySelector('.preview-drill').value;
+      const interval = item.querySelector('.preview-interval').value;
+      
+      exercises.push({
+        repeats,
+        amount,
+        stroke,
+        drill,
+        interval
+      });
     });
     
     // Check if there are any exercises
     if (exercises.length === 0) {
-        alert('No exercises have been added to this workout. Please add at least one exercise before saving.');
-        return;
+      alert('No exercises have been added to this workout. Please add at least one exercise before saving.');
+      return;
     }
     
     // Get other form values
@@ -192,9 +211,9 @@ function handleFormSubmit(e) {
     
     // Auto-calculate total distance if not provided
     if (!totalDistance) {
-        totalDistance = exercises.reduce((sum, ex) => {
-            return sum + (parseInt(ex.repeats) || 1) * (parseInt(ex.amount) || 0);
-        }, 0);
+      totalDistance = exercises.reduce((sum, ex) => {
+        return sum + (parseInt(ex.repeats) || 1) * (parseInt(ex.amount) || 0);
+      }, 0);
     }
     
     // Create workout summary for confirmation
@@ -207,52 +226,53 @@ function handleFormSubmit(e) {
     
     confirmMessage += `Exercises (${exercises.length}):\n`;
     exercises.forEach((ex, index) => {
-        const repeats = parseInt(ex.repeats) > 1 ? `${ex.repeats}x ` : '';
-        confirmMessage += `${index + 1}. ${repeats}${ex.amount}m ${ex.stroke}${ex.drill ? ` (${ex.drill})` : ''}${ex.interval ? ` @ ${ex.interval}` : ''}\n`;
+      const repeats = parseInt(ex.repeats) > 1 ? `${ex.repeats}x ` : '';
+      confirmMessage += `${index + 1}. ${repeats}${ex.amount}m ${ex.stroke}${ex.drill ? ` (${ex.drill})` : ''}${ex.interval ? ` @ ${ex.interval}` : ''}\n`;
     });
     
     confirmMessage += `\nDo you want to save this workout?`;
-
+  
     exercisesJson = JSON.stringify(exercises, null, 2);
-
+  
     // Show confirmation dialog
     if (confirm(confirmMessage)) {
-        // Create workout object
-        const workout = {
-            id: Date.now(),
-            title,
-            totalDistance,
-            mainStroke,
-            intensity,
-            distanceType,
-            notes,
-            exercises,
-            tags: [...currentTags],
-            date: new Date().toISOString()
-        };
-        rows = [title, totalDistance, mainStroke, intensity, distanceType, exercisesJson, currentTags, notes];
-
-        uploadWorkoutToSupabase(workout)
-        .then((result) => {
-            console.log('Upload result:', result);
-            // Local storage operations and UI updates
-            workouts.unshift(workout);
-            saveWorkouts();
-            
-            workoutForm.reset();
-            resetExercises();
-            resetTags();
-            resetExercisePreview();
-            
-            renderWorkouts();
-            alert('Workout uploaded successfully!');
-        })
-        .catch(error => {
-            console.error('Error uploading workout:', error);
-            alert('Error saving workout: ' + error.message);
+      // Create workout object
+      const workout = {
+        id: Date.now(),
+        title,
+        totalDistance,
+        mainStroke,
+        intensity,
+        distanceType,
+        notes,
+        exercises,
+        tags: [...currentTags],
+        date: new Date().toISOString()
+      };
+      rows = [title, totalDistance, mainStroke, intensity, distanceType, exercisesJson, currentTags, notes];
+  
+      uploadWorkoutToSupabase(workout)
+      .then((result) => {
+        console.log('Upload result:', result);
+        
+        // After upload, reload workouts from Supabase
+        loadWorkouts().then(() => {
+          renderWorkouts();
+          
+          workoutForm.reset();
+          resetExercises();
+          resetTags();
+          resetExercisePreview();
+          
+          alert('Workout uploaded successfully!');
         });
+      })
+      .catch(error => {
+        console.error('Error uploading workout:', error);
+        alert('Error saving workout: ' + error.message);
+      });
     }
-}
+  }
 async function uploadWorkoutToSupabase(workout) {
     // Prepare exercise array
     const exerciseArray = workout.exercises.map(exercise => ({
@@ -584,138 +604,144 @@ function filterWorkouts() {
     const filter = filterType.value;
     
     return workouts.filter(workout => {
-        const matchesSearch = 
-            workout.title.toLowerCase().includes(searchTerm) ||
-            workout.mainStroke.toLowerCase().includes(searchTerm) ||
-            workout.tags.some(tag => tag.toLowerCase().includes(searchTerm)) ||
-            workout.exercises.some(ex => ex.stroke.toLowerCase().includes(searchTerm));
-        
-        if (filter === 'all') return matchesSearch;
-        if (filter === 'stroke') return workout.mainStroke.toLowerCase().includes(searchTerm);
-        if (filter === 'tag') return workout.tags.some(tag => tag.toLowerCase().includes(searchTerm));
-        
-        return matchesSearch;
+      const matchesSearch = 
+        (workout.title && workout.title.toLowerCase().includes(searchTerm)) ||
+        (workout.mainStroke && workout.mainStroke.toLowerCase().includes(searchTerm)) ||
+        (Array.isArray(workout.tags) && workout.tags.some(tag => tag && tag.toLowerCase().includes(searchTerm))) ||
+        (Array.isArray(workout.exercises) && workout.exercises.some(ex => ex && ex.stroke && ex.stroke.toLowerCase().includes(searchTerm)));
+      
+      if (filter === 'all') return matchesSearch;
+      if (filter === 'stroke') return workout.mainStroke && workout.mainStroke.toLowerCase().includes(searchTerm);
+      if (filter === 'tag') return Array.isArray(workout.tags) && workout.tags.some(tag => tag && tag.toLowerCase().includes(searchTerm));
+      
+      return matchesSearch;
     });
-}
+  }
+  
 
 // Render workouts
 function renderWorkouts() {
     const filteredWorkouts = filterWorkouts();
     
     if (filteredWorkouts.length === 0) {
-        workoutsContainer.innerHTML = `
-            <div class="card empty-state">
-                <p>No workouts found. Try a different search or add your first workout!</p>
-            </div>
-        `;
-        return;
+      workoutsContainer.innerHTML = `
+        <div class="card empty-state">
+          <p>No workouts found. Try a different search or add your first workout!</p>
+        </div>
+      `;
+      return;
     }
     
     workoutsContainer.innerHTML = '';
     
     filteredWorkouts.forEach(workout => {
-        const workoutCard = document.createElement('div');
-        workoutCard.className = 'card workout-card';
-        
-        // Meta items
-        const metaItems = `
-            <div class="meta-item">
-                <span class="meta-label">Distance:</span> ${workout.totalDistance}m
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Main:</span> ${workout.mainStroke}
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Intensity:</span> ${workout.intensity}
-            </div>
-            <div class="meta-item">
-                <span class="meta-label">Type:</span> ${workout.distanceType}
-            </div>
-        `;
-        
-        // Exercises table
-        let exercisesHTML = `
-            <div class="section-heading">Exercises:</div>
-            <div class="exercises-container">
-                <table class="exercises-table">
-                    <thead>
-                        <tr>
-                            <th>Exercise</th>
-                            <th>Stroke/Drill</th>
-                            <th>Interval</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-        `;
-        
+      const workoutCard = document.createElement('div');
+      workoutCard.className = 'card workout-card';
+      
+      // Meta items
+      const metaItems = `
+        <div class="meta-item">
+          <span class="meta-label">Distance:</span> ${workout.totalDistance}m
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Main:</span> ${workout.mainStroke}
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Intensity:</span> ${workout.intensity}
+        </div>
+        <div class="meta-item">
+          <span class="meta-label">Type:</span> ${workout.distanceType}
+        </div>
+      `;
+      
+      // Exercises table
+      let exercisesHTML = `
+        <div class="section-heading">Exercises:</div>
+        <div class="exercises-container">
+          <table class="exercises-table">
+            <thead>
+              <tr>
+                <th>Exercise</th>
+                <th>Stroke/Drill</th>
+                <th>Interval</th>
+              </tr>
+            </thead>
+            <tbody>
+      `;
+      
+      if (Array.isArray(workout.exercises)) {
         workout.exercises.forEach(ex => {
-            const repeats = parseInt(ex.repeats) || 1;
-            const repeatText = repeats > 1 ? `${repeats}x ` : '';
-            
-            exercisesHTML += `
-                <tr>
-                    <td>${repeatText}${ex.amount}m</td>
-                    <td>${ex.stroke} ${ex.drill ? `(${ex.drill})` : ''}</td>
-                    <td>${ex.interval ? `@ ${ex.interval}` : 'N/A'}</td>
-                </tr>
-            `;
+          const repeats = parseInt(ex.repeats) || 1;
+          const repeatText = repeats > 1 ? `${repeats}x ` : '';
+          
+          exercisesHTML += `
+            <tr>
+              <td>${repeatText}${ex.amount}m</td>
+              <td>${ex.stroke} ${ex.drill ? `(${ex.drill})` : ''}</td>
+              <td>${ex.interval ? `@ ${ex.interval}` : 'N/A'}</td>
+            </tr>
+          `;
         });
-        
-        exercisesHTML += `
-                    </tbody>
-                </table>
+      }
+      
+      exercisesHTML += `
+            </tbody>
+          </table>
+        </div>
+      `;
+      
+      // Tags
+      let tagsHTML = '';
+      if (workout.tags && Array.isArray(workout.tags) && workout.tags.length > 0) {
+        tagsHTML = `
+          <div class="workout-tags">
+            <div class="section-heading">Tags:</div>
+            <div class="tags-container">
+              ${workout.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
             </div>
+          </div>
         `;
-        
-        // Tags
-        let tagsHTML = '';
-        if (workout.tags && workout.tags.length > 0) {
-            tagsHTML = `
-                <div class="workout-tags">
-                    <div class="section-heading">Tags:</div>
-                    <div class="tags-container">
-                        ${workout.tags.map(tag => `<span class="tag">${tag}</span>`).join('')}
-                    </div>
-                </div>
-            `;
-        }
-        
-        // Notes
-        let notesHTML = '';
-        if (workout.notes) {
-            notesHTML = `
-                <div class="workout-notes">
-                    <div class="section-heading">Notes:</div>
-                    <p>${workout.notes}</p>
-                </div>
-            `;
-        }
-        
-        workoutCard.innerHTML = `
-            <div class="workout-header">
-                <h3 class="workout-title">${workout.title}</h3>
-            </div>
-            
-            <div class="workout-meta">
-                ${metaItems}
-            </div>
-            
-            <div class="workout-exercises">
-                ${exercisesHTML}
-            </div>
-            
-            ${tagsHTML}
-            ${notesHTML}
-            
-            <div class="workout-date">
-                Added: ${new Date(workout.date).toLocaleDateString()}
-            </div>
+      }
+      
+      // Notes
+      let notesHTML = '';
+      if (workout.notes) {
+        notesHTML = `
+          <div class="workout-notes">
+            <div class="section-heading">Notes:</div>
+            <p>${workout.notes}</p>
+          </div>
         `;
+      }
+      
+      workoutCard.innerHTML = `
+        <div class="workout-header">
+          <h3 class="workout-title">${workout.title}</h3>
+
+        </div>
         
-        // Add delete button functionality
-        workoutsContainer.appendChild(workoutCard);
+        <div class="workout-meta">
+          ${metaItems}
+        </div>
+        
+        <div class="workout-exercises">
+          ${exercisesHTML}
+        </div>
+        
+        ${tagsHTML}
+        ${notesHTML}
+        
+        <div class="workout-date">
+          Added: ${new Date(workout.date).toLocaleDateString()}
+        </div>
+      `;
+      
+      // Add event listeners for loading this workout
+      addWorkoutCardEventListeners(workoutCard, workout);
+      
+      workoutsContainer.appendChild(workoutCard);
     });
-}
+  }
 
 
 // Initialize the application

@@ -689,7 +689,7 @@ function renderWorkouts() {
     if (filteredWorkouts.length === 0) {
       workoutsContainer.innerHTML = `
         <div class="card empty-state">
-          <p>No workouts found. Try a different search</p>
+          <p>No workouts found. Try a different search or login if you aren't already.</p>
         </div>
       `;
       return;

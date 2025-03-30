@@ -382,7 +382,6 @@ input:focus, select:focus, textarea:focus {
     cursor: not-allowed;
 }
 
-/* Add these styles to your existing CSS */
 .action-button {
     display: block;
     width: 100%;
